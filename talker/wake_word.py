@@ -49,7 +49,7 @@ class WakeWordDetector:
         Args:
             model_name: Name of the pre-trained openWakeWord model to load.
             threshold: Confidence score in [0, 1] above which detection fires.
-            inference_framework: openWakeWord backend, ``"onnx"`` or ``"tflite"``.
+            inference_framework: Backend, ``"onnx"`` or ``"tflite"``.
         """
         self._model_name = model_name
         self._threshold = threshold

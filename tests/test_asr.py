@@ -16,7 +16,8 @@ def _make_mock_client(text: str) -> MagicMock:
         A MagicMock standing in for an OpenAI client.
     """
     client = MagicMock()
-    client.audio.transcriptions.create.return_value = SimpleNamespace(text=text)
+    create = client.audio.transcriptions.create
+    create.return_value = SimpleNamespace(text=text)
     return client
 
 

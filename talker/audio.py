@@ -71,7 +71,7 @@ def record_utterance(
 
     Args:
         silence_threshold: RMS amplitude below which a chunk counts as silent.
-        silence_duration: Seconds of consecutive silence that end the recording.
+        silence_duration: Seconds of consecutive silence that end recording.
         max_duration: Hard cap on total recording length in seconds.
         sample_rate: The sample rate to record at, in Hz.
 
@@ -106,7 +106,10 @@ def record_utterance(
 
             if compute_rms(chunk) < silence_threshold:
                 consecutive_silent += 1
-                if captured_speech and consecutive_silent >= silent_chunks_needed:
+                if (
+                    captured_speech
+                    and consecutive_silent >= silent_chunks_needed
+                ):
                     break
             else:
                 captured_speech = True

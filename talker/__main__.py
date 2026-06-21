@@ -32,7 +32,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--wake-word",
         default=DEFAULT_MODEL,
-        help=f"openWakeWord model name to listen for (default: {DEFAULT_MODEL}).",
+        help=f"openWakeWord model to listen for (default: {DEFAULT_MODEL}).",
     )
     parser.add_argument(
         "--language",
@@ -48,7 +48,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 
 def build_openai_client() -> OpenAI:
-    """Construct an OpenAI client from the ``OPENAI_API_KEY`` environment variable.
+    """Construct an OpenAI client from the ``OPENAI_API_KEY`` env variable.
 
     Returns:
         An initialized OpenAI client.
@@ -81,7 +81,10 @@ def run_input_loop(
     Returns:
         None.
     """
-    print(f'[Talker] Listening for "{wake_word}" (say "{exit_phrase}" to exit)')
+    print(
+        f'[Talker] Listening for "{wake_word}" '
+        f'(say "{exit_phrase}" to exit)'
+    )
     with WakeWordDetector(model_name=wake_word) as detector:
         while True:
             detector.wait_for_wake_word()
@@ -104,7 +107,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     """Program entry point.
 
     Args:
-        argv: Optional argument list (used for testing); defaults to ``sys.argv``.
+        argv: Optional argument list for testing; defaults to ``sys.argv``.
 
     Returns:
         None.
