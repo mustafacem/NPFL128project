@@ -1,0 +1,69 @@
+Sample session, text mode
+=========================
+
+Text mode replaces the microphone with the keyboard, so the dialogue loop can
+be demonstrated on a machine without audio hardware. The model replies below
+came from the default OpenRouter model.
+
+    $ export OPENROUTER_API_KEY="sk-or-..."
+    $ python -m talker --text-mode --history-out history.json
+
+    [Talker] Text mode. Type "goodbye" to exit.
+    [You] What is the capital of France?
+    [Talker] Paris is the capital of France.
+    [You] How many people live there?
+    [Talker] It is about 2.1 million people.
+    [You] goodbye
+    [Talker] Goodbye!
+    [Talker] Conversation saved to history.json
+
+The saved transcript, history.json:
+
+    [
+      {
+        "role": "system",
+        "content": "You are a helpful, friendly voice assistant. Your input comes from a speech-to-text system, so it may contain transcription errors or odd phrasing; use context to infer the user's intent. Keep replies short, clear, and conversational, since they will be read aloud."
+      },
+      {
+        "role": "user",
+        "content": "What is the capital of France?"
+      },
+      {
+        "role": "assistant",
+        "content": "Paris is the capital of France."
+      },
+      {
+        "role": "user",
+        "content": "How many people live there?"
+      },
+      {
+        "role": "assistant",
+        "content": "It is about 2.1 million people."
+      }
+    ]
+
+Note that the second question ("How many people live there?") is only
+answerable because the full history is sent with every request, which is what
+makes the exchange a multi-turn dialogue rather than isolated questions.
+
+
+Sample session, voice mode
+==========================
+
+Voice mode waits for the wake word before each turn, records until the speaker
+pauses, transcribes the utterance, and reads the reply aloud.
+
+    $ export OPENAI_API_KEY="sk-..."
+    $ export OPENROUTER_API_KEY="sk-or-..."
+    $ python -m talker
+
+    [Talker] Listening for "hey_jarvis" (say "goodbye" to exit)
+    [Talker] Wake word detected, listening...
+    [You] What is the capital of France?
+    [Talker] Paris is the capital of France.
+    [Talker] Wake word detected, listening...
+    [You] Goodbye.
+    [Talker] Goodbye!
+    [Talker] Conversation saved to history.json
+
+The [Talker] reply lines are also spoken through the default output device.

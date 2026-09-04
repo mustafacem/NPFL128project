@@ -13,44 +13,42 @@ This project implements a spoken dialogue system inspired by the architecture de
 
 The paper provides a tutorial-style treatment of integrating LLMs into spoken dialogue
 systems, covering speech input processing, dialogue management, and response generation.
-
-## Status
-
-> **Work in progress.** The audio input pipeline (wake word → recording → ASR)
-> is implemented. LLM dialogue and text-to-speech are not yet built.
+Talker follows that cascaded design: each spoken turn passes through a separate
+recognition, dialogue, and synthesis stage rather than a single end-to-end speech model.
 
 ## Scope
 
 ### Implemented
 
-- Microphone recording with automatic end-of-speech (silence) detection
 - Local wake-word detection via [openWakeWord](https://github.com/dscripka/openWakeWord)
   (no API key, runs on CPU)
-- Speech-to-text via the OpenAI Whisper API
-- Command-line entry point that listens, records, transcribes, and prints
-
-### Planned
-
-- Multi-turn dialogue management with full conversation history
+- Microphone recording with automatic end-of-speech (silence) detection
+- Speech-to-text with two interchangeable backends: the OpenAI Whisper API, or a
+  Whisper checkpoint running locally for fully offline recognition
+- Multi-turn dialogue management: the whole conversation is sent with every request,
+  so the agent can resolve context such as "how many people live *there*?"
 - LLM response generation via OpenRouter (configurable model)
-- Text-to-speech synthesis via the OpenAI TTS API
+- Text-to-speech with two interchangeable backends: the OpenAI speech API, or gTTS
 - Configurable system prompt (agent persona / instructions)
-- Conversation history saved to JSON on exit
-- Graceful exit on farewell keyword or Ctrl+C
+- Conversation history saved to JSON when the session ends
+- Graceful exit on a spoken farewell phrase or Ctrl+C
+- Text mode: a keyboard-driven conversation for machines with no audio hardware
+- Unit tests for the dialogue, ASR, LLM, TTS, audio, and command-line modules
 
 ### Left for Future Work
 
-- Wake-word detection (always-on listening)
-- Streaming TTS for lower latency
+- Streaming ASR and TTS, so the agent can reply before the user stops speaking
+- Barge-in: letting the user interrupt a reply that is already being spoken
 - Retrieval-augmented generation (RAG) for domain knowledge
 - Emotion / sentiment detection from speech prosody
-- Multi-language support
+- Custom wake words trained for this agent rather than a stock model
 
 ## Requirements
 
 - Python 3.11+
-- An [OpenAI API key](https://platform.openai.com/) — used for Whisper (ASR) and TTS
-- An [OpenRouter API key](https://openrouter.ai/) — used for LLM dialogue (planned)
+- An [OpenRouter API key](https://openrouter.ai/) — used for LLM dialogue (always required)
+- An [OpenAI API key](https://platform.openai.com/) — only if you use the hosted
+  Whisper (`--stt openai`) or speech (`--tts openai`) backends, which are the defaults
 
 ## Installation
 
@@ -67,9 +65,17 @@ pip install -e .
 pip install --no-deps openwakeword==0.6.0
 ```
 
-Set the API key used for transcription:
+The offline backends are optional extras, installed only if you want them:
 
 ```bash
+pip install -e ".[gtts]"   # gTTS speech synthesis  (--tts gtts)
+pip install -e ".[local]"  # local Whisper model    (--stt local)
+```
+
+Set the API keys you need:
+
+```bash
+export OPENROUTER_API_KEY="sk-or-..."
 export OPENAI_API_KEY="sk-..."
 ```
 
@@ -80,20 +86,45 @@ python -m talker
 ```
 
 Say the wake word (default: **"hey jarvis"**), then speak. The agent records
-until you pause, transcribes your speech, and prints the transcript. Say
-**"goodbye"** to exit.
+until you pause, transcribes your speech, replies, and reads the reply aloud.
+Say **"goodbye"** to exit. The conversation is written to `history.json`.
+
+To run without a microphone or speakers, type instead of speaking:
+
+```bash
+python -m talker --text-mode
+```
+
+To run without sending audio to a hosted service, use the offline backends:
+
+```bash
+python -m talker --stt local --tts gtts
+```
 
 ### Options
 
 ```
 usage: talker [-h] [--wake-word WAKE_WORD] [--language LANGUAGE]
-              [--exit-phrase EXIT_PHRASE]
+              [--exit-phrase EXIT_PHRASE] [--stt {openai,local}]
+              [--local-asr-model LOCAL_ASR_MODEL] [--tts {openai,gtts}]
+              [--voice VOICE] [--llm-model LLM_MODEL]
+              [--system-prompt-file SYSTEM_PROMPT_FILE]
+              [--history-out HISTORY_OUT] [--text-mode] [--speak]
 
 options:
   -h, --help            show this help message and exit
-  --wake-word           openWakeWord model name to listen for (default: hey_jarvis)
-  --language            ISO-639-1 language code for transcription (e.g. 'en')
+  --wake-word           openWakeWord model to listen for (default: hey_jarvis)
+  --language            ISO-639-1 language code for speech (e.g. 'en')
   --exit-phrase         spoken phrase that ends the conversation (default: 'goodbye')
+  --stt                 speech recognition backend (default: openai)
+  --local-asr-model     Hugging Face model id used by the local ASR backend
+  --tts                 speech synthesis backend (default: openai)
+  --voice               voice name for the openai TTS backend (default: alloy)
+  --llm-model           OpenRouter model used for replies (default: qwen/qwen3-8b)
+  --system-prompt-file  file holding the system prompt that sets the persona
+  --history-out         where to save the conversation (default: history.json)
+  --text-mode           type instead of speaking; needs no microphone
+  --speak               in text mode, also read the replies aloud
 ```
 
 ## Running the Tests
@@ -103,13 +134,11 @@ pip install -e ".[dev]"
 pytest
 ```
 
+The test suite mocks every network call and audio device, so it needs no API
+keys and no microphone. The project is also checked with `mypy talker/` and
+`pycodestyle --max-line-length=79 talker/ tests/`.
+
 ## Sample Output
 
-```
-[Talker] Listening for "hey_jarvis" (say "goodbye" to exit)
-[Talker] Wake word detected, listening...
-[You] What is the capital of France?
-[Talker] Wake word detected, listening...
-[You] Goodbye.
-[Talker] Goodbye!
-```
+See [sample_output.txt](sample_output.txt) for full sessions in both text and
+voice mode, together with the JSON transcript they produce.
