@@ -58,13 +58,13 @@ def test_speak_openai_backend_plays_synthesized_audio() -> None:
     play_audio.assert_called_once_with(b"RIFF-fake-wav")
 
 
-def test_speak_gtts_backend_plays_mp3() -> None:
-    """The gtts backend synthesizes MP3 and plays it with the MP3 player."""
+def test_speak_gtts_backend_plays_synthesized_audio() -> None:
+    """The gtts backend hands its MP3 bytes to the same audio player."""
     with patch("talker.tts.synthesize_gtts", return_value=b"ID3-fake-mp3"), \
-            patch("talker.tts.play_mp3") as play_mp3:
+            patch("talker.audio.play_audio") as play_audio:
         speak("hello", backend="gtts", language="cs")
 
-    play_mp3.assert_called_once_with(b"ID3-fake-mp3")
+    play_audio.assert_called_once_with(b"ID3-fake-mp3")
 
 
 def test_speak_empty_text_is_a_no_op() -> None:

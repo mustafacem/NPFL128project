@@ -6,7 +6,7 @@ Two backends are available:
     The OpenAI speech API. Needs an API key; returns WAV audio.
 ``gtts``
     Google Translate's TTS via the :mod:`gtts` package. Needs no API key;
-    returns MP3 audio.
+    returns MP3 audio, which libsndfile decodes for playback.
 
 Synthesis is kept separate from playback so the network call can be unit
 tested without an audio device.
@@ -115,35 +115,9 @@ def speak(
             )
         audio.play_audio(synthesize_openai(text, client, voice=voice))
     elif backend == GTTS_BACKEND:
-        play_mp3(synthesize_gtts(text, language=language))
+        audio.play_audio(synthesize_gtts(text, language=language))
     else:
         raise ValueError(
             f"Unknown TTS backend {backend!r}; "
             f"choose one of {', '.join(AVAILABLE_BACKENDS)}."
         )
-
-
-def play_mp3(mp3_bytes: bytes) -> None:
-    """Play MP3 audio through the default output device.
-
-    A separate player is needed because libsndfile, used elsewhere for WAV
-    playback, does not decode MP3 on every platform.
-
-    Args:
-        mp3_bytes: MP3 file contents to play.
-
-    Returns:
-        None. Side effect: audio is played on the default output device.
-    """
-    # Imported lazily so pygame is only required by the gtts backend.
-    import pygame
-
-    pygame.mixer.init()
-    try:
-        with io.BytesIO(mp3_bytes) as buffer:
-            pygame.mixer.music.load(buffer)
-            pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy():
-                pygame.time.wait(50)
-    finally:
-        pygame.mixer.quit()

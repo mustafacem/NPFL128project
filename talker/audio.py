@@ -147,7 +147,7 @@ def play_audio(audio_bytes: bytes) -> None:
 
     Args:
         audio_bytes: Encoded audio file contents in any format supported by
-            libsndfile (WAV, FLAC, OGG) read via :mod:`soundfile`.
+            libsndfile (WAV, FLAC, OGG, MP3) read via :mod:`soundfile`.
 
     Returns:
         None. Side effect: audio is played on the default output device.
