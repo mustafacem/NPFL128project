@@ -28,6 +28,17 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "mypy>=1.10.0",
+    "pycodestyle>=2.11.0",
+]
+# Offline text-to-speech: Google Translate TTS plus an MP3 player.
+gtts = [
+    "gTTS>=2.5.0,<3",
+    "pygame>=2.5.0,<3",
+]
+# Offline speech recognition with a locally hosted Whisper checkpoint.
+local = [
+    "torch>=2.2.0",
+    "transformers>=4.40.0",
 ]
 
 [project.scripts]

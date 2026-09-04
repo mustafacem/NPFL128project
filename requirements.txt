@@ -16,3 +16,12 @@ requests>=2.0,<3
 # Install openWakeWord itself without its dependencies:
 #   pip install --no-deps openwakeword==0.6.0
 openwakeword==0.6.0
+
+# Optional: the gTTS text-to-speech backend (--tts gtts).
+gTTS>=2.5.0,<3
+pygame>=2.5.0,<3
+
+# Optional: the offline Whisper speech recognition backend (--stt local).
+# Large downloads; only needed if you do not want to use the OpenAI API.
+torch>=2.2.0
+transformers>=4.40.0
