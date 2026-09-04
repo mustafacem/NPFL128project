@@ -88,6 +88,14 @@ python -m talker
 Say the wake word (default: **"hey jarvis"**), then speak. The agent records
 until you pause, transcribes your speech, replies, and reads the reply aloud.
 Say **"goodbye"** to exit. The conversation is written to `history.json`.
+The wake-word model is downloaded automatically the first time you run it.
+
+The default model, like most on OpenRouter, needs credits on your account. To
+try the agent without them, pick one of OpenRouter's free models:
+
+```bash
+python -m talker --llm-model "liquid/lfm-2.5-2.6b:free"
+```
 
 To run without a microphone or speakers, type instead of speaking:
 
