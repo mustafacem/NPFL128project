@@ -8,7 +8,7 @@ hidden file side effects.
 import io
 import math
 import queue
-from typing import Optional
+from typing import Any
 
 import numpy as np
 import sounddevice as sd
@@ -85,7 +85,25 @@ def record_utterance(
 
     chunk_queue: "queue.Queue[np.ndarray]" = queue.Queue()
 
-    def _callback(indata: np.ndarray, frames: int, time_info, status) -> None:
+    def _callback(
+        indata: np.ndarray,
+        frames: int,
+        time_info: Any,
+        status: sd.CallbackFlags,
+    ) -> None:
+        """Hand one recorded chunk to the consumer loop.
+
+        Called by sounddevice on its own thread for every captured block.
+
+        Args:
+            indata: The captured block, shaped (frames, channels).
+            frames: Number of frames in this block.
+            time_info: Stream timestamps supplied by PortAudio (opaque).
+            status: Flags reporting input overflows or underflows.
+
+        Returns:
+            None. Side effect: the block is appended to ``chunk_queue``.
+        """
         # Copy because sounddevice reuses the input buffer between callbacks.
         chunk_queue.put(indata[:, 0].copy())
 
