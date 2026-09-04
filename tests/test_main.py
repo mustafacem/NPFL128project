@@ -4,12 +4,14 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from openai import APIError
 
 from talker.__main__ import (
     DEFAULT_HISTORY_PATH,
     exchange,
     load_system_prompt,
     parse_args,
+    reply_to,
     require_env,
 )
 from talker.dialogue import DEFAULT_SYSTEM_PROMPT, DialogueManager
@@ -82,6 +84,28 @@ def test_require_env_exits_when_missing(
 
     with pytest.raises(SystemExit):
         require_env("TALKER_TEST_KEY")
+
+
+def test_reply_to_reports_api_failure_without_crashing() -> None:
+    """An unreachable model ends the turn with None, not an exception."""
+    manager = DialogueManager(system_prompt="persona")
+    failure = APIError("no credits", request=MagicMock(), body=None)
+
+    with patch("talker.llm.generate_reply", side_effect=failure):
+        reply = reply_to(manager, "hello", MagicMock(), "some/model")
+
+    assert reply is None
+
+
+def test_failed_turn_leaves_history_unchanged() -> None:
+    """A failed request records neither the question nor a reply."""
+    manager = DialogueManager(system_prompt="persona")
+    failure = APIError("no credits", request=MagicMock(), body=None)
+
+    with patch("talker.llm.generate_reply", side_effect=failure):
+        reply_to(manager, "hello", MagicMock(), "some/model")
+
+    assert manager.history == [{"role": "system", "content": "persona"}]
 
 
 def test_exchange_records_both_turns() -> None:

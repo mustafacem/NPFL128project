@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Sequence
 
-from openai import OpenAI
+from openai import APIError, OpenAI
 
 from talker import asr, audio, dialogue, llm, tts
 from talker.dialogue import DialogueManager
@@ -148,6 +148,9 @@ def exchange(
 ) -> str:
     """Record a user turn, generate a reply, and record the reply.
 
+    Both turns are recorded only once the reply arrives, so a failed request
+    does not leave an unanswered user turn in the history.
+
     Args:
         manager: The conversation whose history is extended in place.
         user_text: What the user just said.
@@ -156,11 +159,42 @@ def exchange(
 
     Returns:
         The assistant's reply text.
+
+    Raises:
+        openai.APIError: If the model could not be reached.
     """
+    pending = manager.history + [{"role": "user", "content": user_text}]
+    reply = llm.generate_reply(pending, client, model=model)
     manager.add_user_turn(user_text)
-    reply = llm.generate_reply(manager.history, client, model=model)
     manager.add_assistant_turn(reply)
     return reply
+
+
+def reply_to(
+    manager: DialogueManager,
+    user_text: str,
+    client: OpenAI,
+    model: str,
+) -> Optional[str]:
+    """Generate a reply, reporting API failures instead of crashing.
+
+    Args:
+        manager: The conversation whose history is extended in place.
+        user_text: What the user just said.
+        client: An OpenRouter-backed client used to generate the reply.
+        model: The OpenRouter model identifier to query.
+
+    Returns:
+        The assistant's reply, or ``None`` if the model could not be reached.
+    """
+    try:
+        return exchange(manager, user_text, client, model)
+    except APIError as error:
+        detail = getattr(error, "message", None) or str(error)
+        print(
+            f"[Talker] Sorry, I could not reach the language model. {detail}"
+        )
+        return None
 
 
 def run_voice_loop(
@@ -203,9 +237,11 @@ def run_voice_loop(
                 speak_reply(farewell, args, openai_client)
                 return
 
-            reply = exchange(
+            reply = reply_to(
                 manager, transcript, llm_client, args.llm_model
             )
+            if reply is None:
+                continue
             print(f"[Talker] {reply}")
             speak_reply(reply, args, openai_client)
 
@@ -241,7 +277,9 @@ def run_text_loop(
             print("[Talker] Goodbye!")
             return
 
-        reply = exchange(manager, user_text, llm_client, args.llm_model)
+        reply = reply_to(manager, user_text, llm_client, args.llm_model)
+        if reply is None:
+            continue
         print(f"[Talker] {reply}")
         if args.speak:
             speak_reply(reply, args, openai_client)
