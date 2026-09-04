@@ -4,9 +4,10 @@ OpenRouter exposes an OpenAI-compatible endpoint, so the same ``openai``
 client library is reused with a different base URL.
 """
 
-from typing import Dict, List, Sequence
+from typing import Dict, Iterable, List, Sequence, cast
 
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 """Base URL of OpenRouter's OpenAI-compatible chat completions API."""
@@ -47,7 +48,9 @@ def generate_reply(
     history: List[Dict[str, str]] = list(messages)
     completion = client.chat.completions.create(
         model=model,
-        messages=history,
+        # The plain role/content dictionaries used throughout this project
+        # match the wire format the SDK expects.
+        messages=cast(Iterable[ChatCompletionMessageParam], history),
     )
     content = completion.choices[0].message.content
     return content.strip() if content else ""

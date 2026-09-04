@@ -48,11 +48,18 @@ talker = "talker.__main__:main"
 include = ["talker*"]
 
 [tool.mypy]
-python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 
 # Third-party audio/ML libraries ship no type stubs.
 [[tool.mypy.overrides]]
-module = ["sounddevice", "soundfile", "openwakeword.*"]
+module = [
+    "sounddevice",
+    "soundfile",
+    "openwakeword.*",
+    "gtts",
+    "pygame",
+    "torch",
+    "transformers",
+]
 ignore_missing_imports = true
