@@ -93,11 +93,12 @@ until you pause, transcribes your speech, replies, and reads the reply aloud.
 Say **"goodbye"** to exit. The conversation is written to `history.json`.
 The wake-word model is downloaded automatically the first time you run it.
 
-The default model, like most on OpenRouter, needs credits on your account. To
-try the agent without them, pick one of OpenRouter's free models:
+The default model is one of OpenRouter's free models, so the agent runs
+without account credit. Free models are rate limited and occasionally busy;
+for better replies and availability, pass a paid model instead:
 
 ```bash
-python -m talker --llm-model "liquid/lfm-2.5-2.6b:free"
+python -m talker --llm-model "qwen/qwen3-8b"
 ```
 
 To run without a microphone or speakers, type instead of speaking:
@@ -131,7 +132,7 @@ options:
   --local-asr-model     Hugging Face model id used by the local ASR backend
   --tts                 speech synthesis backend (default: openai)
   --voice               voice name for the openai TTS backend (default: alloy)
-  --llm-model           OpenRouter model used for replies (default: qwen/qwen3-8b)
+  --llm-model           OpenRouter model for replies (default: liquid/lfm-2.5-2.6b:free)
   --system-prompt-file  file holding the system prompt that sets the persona
   --history-out         where to save the conversation (default: history.json)
   --text-mode           type instead of speaking; needs no microphone

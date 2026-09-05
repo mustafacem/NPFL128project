@@ -13,7 +13,7 @@ Text mode replaces the microphone with the keyboard, so the dialogue loop can
 be exercised on a machine without audio hardware.
 
     $ export OPENROUTER_API_KEY="sk-or-..."
-    $ python -m talker --text-mode --llm-model "liquid/lfm-2.5-2.6b:free"
+    $ python -m talker --text-mode
 
     [Talker] Text mode. Type "goodbye" to exit.
     [You] What is the capital of France?

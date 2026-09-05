@@ -12,8 +12,13 @@ from openai.types.chat import ChatCompletionMessageParam
 OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 """Base URL of OpenRouter's OpenAI-compatible chat completions API."""
 
-DEFAULT_LLM_MODEL: str = "qwen/qwen3-8b"
-"""Default OpenRouter model used for dialogue responses."""
+DEFAULT_LLM_MODEL: str = "liquid/lfm-2.5-2.6b:free"
+"""Default OpenRouter model used for dialogue responses.
+
+A free model is the default so the agent runs without account credit. Free
+models are rate limited and can be busy, so pass ``--llm-model`` to use a
+paid model such as ``qwen/qwen3-8b`` for better replies and availability.
+"""
 
 
 def build_client(api_key: str) -> OpenAI:
