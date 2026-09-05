@@ -8,13 +8,16 @@ into a single end-to-end pipeline.
 
 This project implements a spoken dialogue system inspired by the architecture described in:
 
-> Yang, C.-H. H., Stolcke, A., & Heck, L. (2024). *Spoken Conversational Agents with
+> Yang, C.-H. H., Stolcke, A., & Heck, L. (2025). *Spoken Conversational Agents with
 > Large Language Models*. arXiv:2512.02593. <https://arxiv.org/abs/2512.02593>
+> (Tutorial accepted at EMNLP 2025.)
 
-The paper provides a tutorial-style treatment of integrating LLMs into spoken dialogue
-systems, covering speech input processing, dialogue management, and response generation.
-Talker follows that cascaded design: each spoken turn passes through a separate
-recognition, dialogue, and synthesis stage rather than a single end-to-end speech model.
+The tutorial traces spoken dialogue systems from cascaded speech recognition pipelines
+through to end-to-end voice-native models, covering speech input processing, dialogue
+management, and response generation. Talker implements the cascaded design it describes:
+each spoken turn passes through a separate recognition, dialogue, and synthesis stage
+rather than a single end-to-end speech model. The end-to-end alternative the tutorial
+also surveys is out of scope here.
 
 ## Scope
 
