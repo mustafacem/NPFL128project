@@ -14,6 +14,8 @@ import sounddevice as sd
 from openwakeword.model import Model
 from openwakeword.utils import download_models
 
+from talker.audio import resample, supported_input_rate
+
 DEFAULT_MODEL: str = "hey_jarvis"
 """Name of the pre-trained openWakeWord model used by default."""
 
@@ -86,14 +88,20 @@ class WakeWordDetector:
             inference_framework=inference_framework,
         )
         self._stream: Optional[sd.InputStream] = None
+        # The microphone may not offer 16 kHz, so record at a rate it does
+        # support and convert each block before scoring it.
+        self._device_rate = supported_input_rate(_SAMPLE_RATE, 1)
+        self._device_frames = (
+            _FRAME_SAMPLES * self._device_rate // _SAMPLE_RATE
+        )
 
     def __enter__(self) -> "WakeWordDetector":
         """Open the microphone input stream."""
         self._stream = sd.InputStream(
-            samplerate=_SAMPLE_RATE,
+            samplerate=self._device_rate,
             channels=1,
-            blocksize=_FRAME_SAMPLES,
-            dtype="int16",
+            blocksize=self._device_frames,
+            dtype="float32",
         )
         self._stream.start()
         return self
@@ -126,9 +134,22 @@ class WakeWordDetector:
             )
 
         while True:
-            frame, _overflowed = self._stream.read(_FRAME_SAMPLES)
-            if self.detect_in_frame(np.frombuffer(frame, dtype=np.int16)):
+            block, _overflowed = self._stream.read(self._device_frames)
+            if self.detect_in_frame(self._to_model_frame(block[:, 0])):
                 return
+
+    def _to_model_frame(self, block: np.ndarray) -> np.ndarray:
+        """Convert one recorded block into a frame the model can score.
+
+        Args:
+            block: Mono float32 samples captured at the device's own rate.
+
+        Returns:
+            Exactly :data:`_FRAME_SAMPLES` int16 samples at 16 kHz.
+        """
+        converted = resample(block, self._device_rate, _SAMPLE_RATE)
+        scaled = np.clip(converted, -1.0, 1.0) * 32767
+        return np.asarray(scaled, dtype=np.int16)
 
     def detect_in_frame(self, samples: np.ndarray) -> bool:
         """Score one audio frame and report whether the wake word fired.

@@ -45,6 +45,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Optional ISO-639-1 language code for speech (e.g. 'en').",
     )
     parser.add_argument(
+        "--silence-threshold",
+        type=float,
+        default=audio.DEFAULT_SILENCE_THRESHOLD,
+        help=(
+            "loudness below which the microphone counts as silent, ending "
+            "a recording (default: "
+            f"{audio.DEFAULT_SILENCE_THRESHOLD}). Raise it in a noisy room "
+            "if recordings never stop; lower it if they cut you off."
+        ),
+    )
+    parser.add_argument(
         "--exit-phrase",
         default="goodbye",
         help="Spoken phrase that ends the conversation (default: 'goodbye').",
@@ -225,7 +236,11 @@ def run_voice_loop(
             detector.wait_for_wake_word()
             print("[Talker] Wake word detected, listening...")
 
-            transcript = transcribe(audio.record_utterance())
+            transcript = transcribe(
+                audio.record_utterance(
+                    silence_threshold=args.silence_threshold
+                )
+            )
             if not transcript:
                 print("[Talker] Heard nothing, going back to sleep.")
                 continue

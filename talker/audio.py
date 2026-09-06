@@ -24,6 +24,9 @@ CHANNELS: int = 1
 _CHUNK_DURATION: float = 0.1
 """Length in seconds of each audio chunk read while recording."""
 
+DEFAULT_SILENCE_THRESHOLD: float = 0.01
+"""RMS amplitude below which recorded audio counts as silence."""
+
 
 def compute_rms(samples: np.ndarray) -> float:
     """Compute the root-mean-square amplitude of an audio buffer.
@@ -58,8 +61,30 @@ def audio_to_wav_bytes(
     return buffer.getvalue()
 
 
+def supported_input_rate(sample_rate: int, channels: int) -> int:
+    """Find a sample rate the default input device is able to record at.
+
+    Microphones commonly offer 44.1 and 48 kHz but not the 16 kHz that
+    speech recognizers expect, so the audio has to be converted afterwards.
+
+    Args:
+        sample_rate: The sample rate the caller would prefer, in Hz.
+        channels: The number of channels to record.
+
+    Returns:
+        ``sample_rate`` if the device accepts it, otherwise the device's own
+        default sample rate.
+    """
+    try:
+        sd.check_input_settings(samplerate=sample_rate, channels=channels)
+        return sample_rate
+    except sd.PortAudioError:
+        device = sd.query_devices(kind="input")
+        return int(device["default_samplerate"])
+
+
 def record_utterance(
-    silence_threshold: float = 0.01,
+    silence_threshold: float = DEFAULT_SILENCE_THRESHOLD,
     silence_duration: float = 1.5,
     max_duration: float = 30.0,
     sample_rate: int = SAMPLE_RATE,
@@ -80,7 +105,8 @@ def record_utterance(
         The recorded audio encoded as 16-bit PCM WAV bytes. Returns an empty
         WAV file if nothing was captured.
     """
-    chunk_frames = int(sample_rate * _CHUNK_DURATION)
+    device_rate = supported_input_rate(sample_rate, CHANNELS)
+    chunk_frames = int(device_rate * _CHUNK_DURATION)
     silent_chunks_needed = int(silence_duration / _CHUNK_DURATION)
     max_chunks = int(max_duration / _CHUNK_DURATION)
 
@@ -113,7 +139,7 @@ def record_utterance(
     captured_speech = False
 
     with sd.InputStream(
-        samplerate=sample_rate,
+        samplerate=device_rate,
         channels=CHANNELS,
         blocksize=chunk_frames,
         dtype="float32",
@@ -137,7 +163,7 @@ def record_utterance(
     if not recorded:
         return audio_to_wav_bytes(np.zeros(0, dtype=np.float32), sample_rate)
 
-    samples = np.concatenate(recorded)
+    samples = resample(np.concatenate(recorded), device_rate, sample_rate)
     return audio_to_wav_bytes(samples, sample_rate)
 
 
