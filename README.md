@@ -8,48 +8,149 @@ into a single end-to-end pipeline.
 
 This project implements a spoken dialogue system inspired by the architecture described in:
 
-> Yang, C.-H. H., Stolcke, A., & Heck, L. (2024). *Spoken Conversational Agents with
+> Yang, C.-H. H., Stolcke, A., & Heck, L. (2025). *Spoken Conversational Agents with
 > Large Language Models*. arXiv:2512.02593. <https://arxiv.org/abs/2512.02593>
+> (Tutorial accepted at EMNLP 2025.)
 
-The paper provides a tutorial-style treatment of integrating LLMs into spoken dialogue
-systems, covering speech input processing, dialogue management, and response generation.
-
-## Status
-
-> **Work in progress.** No functionality has been implemented yet.
-> This repository contains the initial project scaffold only.
+The tutorial traces spoken dialogue systems from cascaded speech recognition pipelines
+through to end-to-end voice-native models, covering speech input processing, dialogue
+management, and response generation. Talker implements the cascaded design it describes:
+each spoken turn passes through a separate recognition, dialogue, and synthesis stage
+rather than a single end-to-end speech model. The end-to-end alternative the tutorial
+also surveys is out of scope here.
 
 ## Scope
 
-### Planned
+### Implemented
 
-- Microphone audio capture and playback
-- Speech-to-text via the OpenAI Whisper API
-- Multi-turn dialogue management with full conversation history
+- Local wake-word detection via [openWakeWord](https://github.com/dscripka/openWakeWord)
+  (no API key, runs on CPU)
+- Microphone recording with automatic end-of-speech (silence) detection
+- Speech-to-text with two interchangeable backends: the OpenAI Whisper API, or a
+  Whisper checkpoint running locally for fully offline recognition
+- Multi-turn dialogue management: the whole conversation is sent with every request,
+  so the agent can resolve context such as "how many people live *there*?"
 - LLM response generation via OpenRouter (configurable model)
-- Text-to-speech synthesis via the OpenAI TTS API
+- Text-to-speech with two interchangeable backends: the OpenAI speech API, or gTTS
 - Configurable system prompt (agent persona / instructions)
-- Conversation history saved to JSON on exit
-- Graceful exit on farewell keyword or Ctrl+C
+- Conversation history saved to JSON when the session ends
+- Graceful exit on a spoken farewell phrase or Ctrl+C
+- Text mode: a keyboard-driven conversation for machines with no audio hardware
+- Unit tests for the dialogue, ASR, LLM, TTS, audio, and command-line modules
 
 ### Left for Future Work
 
-- Wake-word detection (always-on listening)
-- Streaming TTS for lower latency
+- Streaming ASR and TTS, so the agent can reply before the user stops speaking
+- Barge-in: letting the user interrupt a reply that is already being spoken
 - Retrieval-augmented generation (RAG) for domain knowledge
 - Emotion / sentiment detection from speech prosody
-- Multi-language support
+- Custom wake words trained for this agent rather than a stock model
 
 ## Requirements
 
 - Python 3.11+
-- An [OpenAI API key](https://platform.openai.com/) — used for Whisper (ASR) and TTS
-- An [OpenRouter API key](https://openrouter.ai/) — used for LLM dialogue
+- An [OpenRouter API key](https://openrouter.ai/) — used for LLM dialogue (always required)
+- An [OpenAI API key](https://platform.openai.com/) — only if you use the hosted
+  Whisper (`--stt openai`) or speech (`--tts openai`) backends, which are the defaults
+
+## Installation
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+
+# Install Talker and its dependencies.
+pip install -e .
+
+# openWakeWord declares a hard dependency on tflite-runtime, which has no
+# wheel for recent Python versions on Linux. Talker uses the ONNX backend
+# instead, so openWakeWord is installed without its own dependencies:
+pip install --no-deps openwakeword==0.6.0
+```
+
+The offline backends are optional extras, installed only if you want them:
+
+```bash
+pip install -e ".[gtts]"   # gTTS speech synthesis  (--tts gtts)
+pip install -e ".[local]"  # local Whisper model    (--stt local)
+```
+
+Set the API keys you need:
+
+```bash
+export OPENROUTER_API_KEY="sk-or-..."
+export OPENAI_API_KEY="sk-..."
+```
 
 ## How to Run
 
-> Not yet available. Will be updated once the implementation is complete.
+```bash
+python -m talker
+```
+
+Say the wake word (default: **"hey jarvis"**), then speak. The agent records
+until you pause, transcribes your speech, replies, and reads the reply aloud.
+Say **"goodbye"** to exit. The conversation is written to `history.json`.
+The wake-word model is downloaded automatically the first time you run it.
+
+The default model is one of OpenRouter's free models, so the agent runs
+without account credit. Free models are rate limited and occasionally busy;
+for better replies and availability, pass a paid model instead:
+
+```bash
+python -m talker --llm-model "qwen/qwen3-8b"
+```
+
+To run without a microphone or speakers, type instead of speaking:
+
+```bash
+python -m talker --text-mode
+```
+
+To run without sending audio to a hosted service, use the offline backends:
+
+```bash
+python -m talker --stt local --tts gtts
+```
+
+### Options
+
+```
+usage: talker [-h] [--wake-word WAKE_WORD] [--language LANGUAGE]
+              [--exit-phrase EXIT_PHRASE] [--stt {openai,local}]
+              [--local-asr-model LOCAL_ASR_MODEL] [--tts {openai,gtts}]
+              [--voice VOICE] [--llm-model LLM_MODEL]
+              [--system-prompt-file SYSTEM_PROMPT_FILE]
+              [--history-out HISTORY_OUT] [--text-mode] [--speak]
+
+options:
+  -h, --help            show this help message and exit
+  --wake-word           openWakeWord model to listen for (default: hey_jarvis)
+  --language            ISO-639-1 language code for speech (e.g. 'en')
+  --exit-phrase         spoken phrase that ends the conversation (default: 'goodbye')
+  --stt                 speech recognition backend (default: openai)
+  --local-asr-model     Hugging Face model id used by the local ASR backend
+  --tts                 speech synthesis backend (default: openai)
+  --voice               voice name for the openai TTS backend (default: alloy)
+  --llm-model           OpenRouter model for replies (default: liquid/lfm-2.5-2.6b:free)
+  --system-prompt-file  file holding the system prompt that sets the persona
+  --history-out         where to save the conversation (default: history.json)
+  --text-mode           type instead of speaking; needs no microphone
+  --speak               in text mode, also read the replies aloud
+```
+
+## Running the Tests
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+The test suite mocks every network call and audio device, so it needs no API
+keys and no microphone. The project is also checked with `mypy talker/` and
+`pycodestyle --max-line-length=79 talker/ tests/`.
 
 ## Sample Output
 
-> Not yet available.
+See [sample_output.txt](sample_output.txt) for full sessions in both text and
+voice mode, together with the JSON transcript they produce.

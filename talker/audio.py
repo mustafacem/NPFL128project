@@ -1,0 +1,235 @@
+"""Low-level audio I/O: microphone recording with silence detection,
+WAV encoding, and audio playback.
+
+All functions operate on in-memory data so they remain testable and free of
+hidden file side effects.
+"""
+
+import io
+import math
+import queue
+from typing import Any
+
+import numpy as np
+import sounddevice as sd
+import soundfile as sf
+from scipy.signal import resample_poly
+
+SAMPLE_RATE: int = 16_000
+"""Default sample rate in Hz. Matches the rate expected by the Whisper API."""
+
+CHANNELS: int = 1
+"""Default number of audio channels (mono)."""
+
+_CHUNK_DURATION: float = 0.1
+"""Length in seconds of each audio chunk read while recording."""
+
+DEFAULT_SILENCE_THRESHOLD: float = 0.01
+"""RMS amplitude below which recorded audio counts as silence."""
+
+
+def compute_rms(samples: np.ndarray) -> float:
+    """Compute the root-mean-square amplitude of an audio buffer.
+
+    Args:
+        samples: A 1-D array of float32 audio samples in the range [-1, 1].
+
+    Returns:
+        The RMS amplitude as a non-negative float. Returns 0.0 for an empty
+        buffer.
+    """
+    if samples.size == 0:
+        return 0.0
+    return float(math.sqrt(np.mean(np.square(samples, dtype=np.float64))))
+
+
+def audio_to_wav_bytes(
+    samples: np.ndarray,
+    sample_rate: int = SAMPLE_RATE,
+) -> bytes:
+    """Encode float audio samples as in-memory WAV bytes.
+
+    Args:
+        samples: A 1-D array of float32 audio samples in the range [-1, 1].
+        sample_rate: The sample rate of the audio in Hz.
+
+    Returns:
+        The audio encoded as 16-bit PCM WAV file contents.
+    """
+    buffer = io.BytesIO()
+    sf.write(buffer, samples, sample_rate, format="WAV", subtype="PCM_16")
+    return buffer.getvalue()
+
+
+def supported_input_rate(sample_rate: int, channels: int) -> int:
+    """Find a sample rate the default input device is able to record at.
+
+    Microphones commonly offer 44.1 and 48 kHz but not the 16 kHz that
+    speech recognizers expect, so the audio has to be converted afterwards.
+
+    Args:
+        sample_rate: The sample rate the caller would prefer, in Hz.
+        channels: The number of channels to record.
+
+    Returns:
+        ``sample_rate`` if the device accepts it, otherwise the device's own
+        default sample rate.
+    """
+    try:
+        sd.check_input_settings(samplerate=sample_rate, channels=channels)
+        return sample_rate
+    except sd.PortAudioError:
+        device = sd.query_devices(kind="input")
+        return int(device["default_samplerate"])
+
+
+def record_utterance(
+    silence_threshold: float = DEFAULT_SILENCE_THRESHOLD,
+    silence_duration: float = 1.5,
+    max_duration: float = 30.0,
+    sample_rate: int = SAMPLE_RATE,
+) -> bytes:
+    """Record from the default microphone until the speaker falls silent.
+
+    Recording stops after ``silence_duration`` seconds of consecutive silence
+    (RMS amplitude below ``silence_threshold``) or once ``max_duration`` is
+    reached, whichever comes first.
+
+    Args:
+        silence_threshold: RMS amplitude below which a chunk counts as silent.
+        silence_duration: Seconds of consecutive silence that end recording.
+        max_duration: Hard cap on total recording length in seconds.
+        sample_rate: The sample rate to record at, in Hz.
+
+    Returns:
+        The recorded audio encoded as 16-bit PCM WAV bytes. Returns an empty
+        WAV file if nothing was captured.
+    """
+    device_rate = supported_input_rate(sample_rate, CHANNELS)
+    chunk_frames = int(device_rate * _CHUNK_DURATION)
+    silent_chunks_needed = int(silence_duration / _CHUNK_DURATION)
+    max_chunks = int(max_duration / _CHUNK_DURATION)
+
+    chunk_queue: "queue.Queue[np.ndarray]" = queue.Queue()
+
+    def _callback(
+        indata: np.ndarray,
+        frames: int,
+        time_info: Any,
+        status: sd.CallbackFlags,
+    ) -> None:
+        """Hand one recorded chunk to the consumer loop.
+
+        Called by sounddevice on its own thread for every captured block.
+
+        Args:
+            indata: The captured block, shaped (frames, channels).
+            frames: Number of frames in this block.
+            time_info: Stream timestamps supplied by PortAudio (opaque).
+            status: Flags reporting input overflows or underflows.
+
+        Returns:
+            None. Side effect: the block is appended to ``chunk_queue``.
+        """
+        # Copy because sounddevice reuses the input buffer between callbacks.
+        chunk_queue.put(indata[:, 0].copy())
+
+    recorded: list[np.ndarray] = []
+    consecutive_silent = 0
+    captured_speech = False
+
+    with sd.InputStream(
+        samplerate=device_rate,
+        channels=CHANNELS,
+        blocksize=chunk_frames,
+        dtype="float32",
+        callback=_callback,
+    ):
+        for _ in range(max_chunks):
+            chunk = chunk_queue.get()
+            recorded.append(chunk)
+
+            if compute_rms(chunk) < silence_threshold:
+                consecutive_silent += 1
+                if (
+                    captured_speech
+                    and consecutive_silent >= silent_chunks_needed
+                ):
+                    break
+            else:
+                captured_speech = True
+                consecutive_silent = 0
+
+    if not recorded:
+        return audio_to_wav_bytes(np.zeros(0, dtype=np.float32), sample_rate)
+
+    samples = resample(np.concatenate(recorded), device_rate, sample_rate)
+    return audio_to_wav_bytes(samples, sample_rate)
+
+
+def resample(
+    samples: np.ndarray,
+    source_rate: int,
+    target_rate: int,
+) -> np.ndarray:
+    """Resample audio to a different sample rate.
+
+    Args:
+        samples: Audio samples as float32, mono or multi-channel.
+        source_rate: The sample rate the audio currently has, in Hz.
+        target_rate: The sample rate to convert to, in Hz.
+
+    Returns:
+        The resampled audio, or the input unchanged if the rates are equal.
+    """
+    if source_rate == target_rate:
+        return samples
+    common = math.gcd(source_rate, target_rate)
+    converted = resample_poly(
+        samples, target_rate // common, source_rate // common, axis=0
+    )
+    return np.asarray(converted, dtype=np.float32)
+
+
+def supported_output_rate(sample_rate: int, channels: int) -> int:
+    """Find a sample rate the default output device is able to play.
+
+    Sound cards accept only certain rates: many support 44.1 and 48 kHz but
+    not the 24 kHz that speech synthesizers commonly return.
+
+    Args:
+        sample_rate: The sample rate the audio already has, in Hz.
+        channels: The number of channels the audio has.
+
+    Returns:
+        ``sample_rate`` if the device accepts it, otherwise the device's own
+        default sample rate.
+    """
+    try:
+        sd.check_output_settings(samplerate=sample_rate, channels=channels)
+        return sample_rate
+    except sd.PortAudioError:
+        device = sd.query_devices(kind="output")
+        return int(device["default_samplerate"])
+
+
+def play_audio(audio_bytes: bytes) -> None:
+    """Play encoded audio (e.g. WAV or MP3) through the default output device.
+
+    The audio is resampled first if the output device cannot play it at its
+    original rate. This function blocks until playback finishes.
+
+    Args:
+        audio_bytes: Encoded audio file contents in any format supported by
+            libsndfile (WAV, FLAC, OGG, MP3) read via :mod:`soundfile`.
+
+    Returns:
+        None. Side effect: audio is played on the default output device.
+    """
+    with io.BytesIO(audio_bytes) as buffer:
+        samples, sample_rate = sf.read(buffer, dtype="float32")
+
+    channels = 1 if samples.ndim == 1 else samples.shape[1]
+    output_rate = supported_output_rate(int(sample_rate), channels)
+    sd.play(resample(samples, int(sample_rate), output_rate), output_rate)
+    sd.wait()

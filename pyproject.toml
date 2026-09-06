@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "talker"
+version = "0.1.0"
+description = "A spoken dialogue agent: wake word -> ASR -> LLM -> TTS."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Mustafa Cem Buyukalpelli" }]
+dependencies = [
+    "sounddevice>=0.4.6",
+    "soundfile>=0.12.1",
+    "numpy>=1.26.0",
+    "openai>=1.30.0",
+    # openWakeWord runtime dependencies. openWakeWord itself is installed
+    # separately with --no-deps to skip its Linux-only tflite-runtime pin,
+    # which has no Python 3.12 wheel (see README).
+    "onnxruntime>=1.10.0,<2",
+    "tqdm>=4.0,<5",
+    "scipy>=1.3,<2",
+    "scikit-learn>=1,<2",
+    "requests>=2.0,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "mypy>=1.10.0",
+    "pycodestyle>=2.11.0",
+]
+# Offline text-to-speech via Google Translate.
+gtts = [
+    "gTTS>=2.5.0,<3",
+]
+# Offline speech recognition with a locally hosted Whisper checkpoint.
+local = [
+    "torch>=2.2.0",
+    "transformers>=5.0.0",
+]
+
+[project.scripts]
+talker = "talker.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["talker*"]
+
+[tool.mypy]
+warn_return_any = true
+warn_unused_configs = true
+
+# Third-party audio/ML libraries ship no type stubs.
+[[tool.mypy.overrides]]
+module = [
+    "sounddevice",
+    "soundfile",
+    "scipy.*",
+    "openwakeword.*",
+    "gtts",
+    "torch",
+    "transformers",
+]
+ignore_missing_imports = true
