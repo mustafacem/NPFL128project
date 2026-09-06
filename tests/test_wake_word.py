@@ -45,12 +45,41 @@ def test_detect_in_frame_fires_on_any_loaded_model() -> None:
     assert detector.detect_in_frame(np.zeros(1280, dtype=np.int16))
 
 
-def test_wait_for_wake_word_requires_open_stream() -> None:
-    """Listening outside the context manager is a clear error."""
+def test_reading_without_an_open_stream_is_an_error() -> None:
+    """Reading audio before the stream is opened fails loudly."""
     detector = _make_detector({"hey_jarvis": 0.9})
 
     with pytest.raises(RuntimeError, match="Input stream is not open"):
+        detector._read_block()
+
+
+def test_microphone_is_released_after_detection() -> None:
+    """The device is freed once the wake word fires.
+
+    The recorder opens the microphone for the utterance that follows, and
+    sound cards commonly allow only one capture stream at a time.
+    """
+    detector = _make_detector({"hey_jarvis": 0.9})
+    stream = MagicMock()
+    stream.read.return_value = (np.zeros((3528, 1), dtype=np.float32), False)
+
+    with patch("talker.wake_word.sd.InputStream", return_value=stream):
         detector.wait_for_wake_word()
+
+    stream.stop.assert_called_once()
+    stream.close.assert_called_once()
+
+
+def test_listening_clears_buffered_audio() -> None:
+    """Stale audio is dropped so the last utterance cannot re-trigger."""
+    detector = _make_detector({"hey_jarvis": 0.9})
+    stream = MagicMock()
+    stream.read.return_value = (np.zeros((3528, 1), dtype=np.float32), False)
+
+    with patch("talker.wake_word.sd.InputStream", return_value=stream):
+        detector.wait_for_wake_word()
+
+    detector._model.reset.assert_called_once()
 
 
 def test_ensure_model_downloaded_skips_existing_model() -> None:

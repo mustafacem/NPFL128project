@@ -60,8 +60,13 @@ def ensure_model_downloaded(model_name: str = DEFAULT_MODEL) -> None:
 class WakeWordDetector:
     """Detects a spoken wake word on the default microphone.
 
+    The microphone is held only while actually listening: it is released as
+    soon as the wake word fires, so the recorder can open the device for the
+    utterance that follows. Sound cards commonly permit only one capture
+    stream at a time.
+
     Intended to be used as a context manager so the input stream is always
-    released::
+    released, even if listening is interrupted::
 
         with WakeWordDetector() as detector:
             detector.wait_for_wake_word()
@@ -96,7 +101,20 @@ class WakeWordDetector:
         )
 
     def __enter__(self) -> "WakeWordDetector":
-        """Open the microphone input stream."""
+        """Enter the context; the stream is opened only while listening."""
+        return self
+
+    def _open_stream(self) -> None:
+        """Open the microphone stream and clear stale audio from the model.
+
+        Returns:
+            None. Side effect: claims the default input device.
+        """
+        if self._stream is not None:
+            return
+        # Drop audio buffered before this turn so the previous utterance
+        # cannot trigger a detection again.
+        self._model.reset()
         self._stream = sd.InputStream(
             samplerate=self._device_rate,
             channels=1,
@@ -104,7 +122,6 @@ class WakeWordDetector:
             dtype="float32",
         )
         self._stream.start()
-        return self
 
     def __exit__(
         self,
@@ -118,25 +135,35 @@ class WakeWordDetector:
     def wait_for_wake_word(self) -> None:
         """Block until the configured wake word is detected.
 
-        Reads audio frames from the open input stream and feeds them to the
-        model until any loaded wake word exceeds the confidence threshold.
-
-        Raises:
-            RuntimeError: If called outside an open input stream context.
+        Claims the microphone, feeds it to the model frame by frame, and
+        releases the device again before returning so that the utterance
+        following the wake word can be recorded.
 
         Returns:
             None. Returns as soon as the wake word is detected.
         """
-        if self._stream is None:
-            raise RuntimeError(
-                "Input stream is not open. Use WakeWordDetector as a context "
-                "manager before calling wait_for_wake_word()."
-            )
+        self._open_stream()
+        try:
+            while True:
+                block, _overflowed = self._read_block()
+                if self.detect_in_frame(self._to_model_frame(block)):
+                    return
+        finally:
+            self.close()
 
-        while True:
-            block, _overflowed = self._stream.read(self._device_frames)
-            if self.detect_in_frame(self._to_model_frame(block[:, 0])):
-                return
+    def _read_block(self) -> tuple:
+        """Read one block of audio from the open stream.
+
+        Returns:
+            A tuple of the mono samples and PortAudio's overflow flag.
+
+        Raises:
+            RuntimeError: If the input stream is not open.
+        """
+        if self._stream is None:
+            raise RuntimeError("Input stream is not open.")
+        block, overflowed = self._stream.read(self._device_frames)
+        return block[:, 0], overflowed
 
     def _to_model_frame(self, block: np.ndarray) -> np.ndarray:
         """Convert one recorded block into a frame the model can score.
