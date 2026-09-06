@@ -55,6 +55,7 @@ warn_unused_configs = true
 module = [
     "sounddevice",
     "soundfile",
+    "scipy.*",
     "openwakeword.*",
     "gtts",
     "torch",

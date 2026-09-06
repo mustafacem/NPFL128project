@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
+from scipy.signal import resample_poly
 
 SAMPLE_RATE: int = 16_000
 """Default sample rate in Hz. Matches the rate expected by the Whisper API."""
@@ -140,10 +141,57 @@ def record_utterance(
     return audio_to_wav_bytes(samples, sample_rate)
 
 
+def resample(
+    samples: np.ndarray,
+    source_rate: int,
+    target_rate: int,
+) -> np.ndarray:
+    """Resample audio to a different sample rate.
+
+    Args:
+        samples: Audio samples as float32, mono or multi-channel.
+        source_rate: The sample rate the audio currently has, in Hz.
+        target_rate: The sample rate to convert to, in Hz.
+
+    Returns:
+        The resampled audio, or the input unchanged if the rates are equal.
+    """
+    if source_rate == target_rate:
+        return samples
+    common = math.gcd(source_rate, target_rate)
+    converted = resample_poly(
+        samples, target_rate // common, source_rate // common, axis=0
+    )
+    return np.asarray(converted, dtype=np.float32)
+
+
+def supported_output_rate(sample_rate: int, channels: int) -> int:
+    """Find a sample rate the default output device is able to play.
+
+    Sound cards accept only certain rates: many support 44.1 and 48 kHz but
+    not the 24 kHz that speech synthesizers commonly return.
+
+    Args:
+        sample_rate: The sample rate the audio already has, in Hz.
+        channels: The number of channels the audio has.
+
+    Returns:
+        ``sample_rate`` if the device accepts it, otherwise the device's own
+        default sample rate.
+    """
+    try:
+        sd.check_output_settings(samplerate=sample_rate, channels=channels)
+        return sample_rate
+    except sd.PortAudioError:
+        device = sd.query_devices(kind="output")
+        return int(device["default_samplerate"])
+
+
 def play_audio(audio_bytes: bytes) -> None:
     """Play encoded audio (e.g. WAV or MP3) through the default output device.
 
-    This function blocks until playback finishes.
+    The audio is resampled first if the output device cannot play it at its
+    original rate. This function blocks until playback finishes.
 
     Args:
         audio_bytes: Encoded audio file contents in any format supported by
@@ -154,5 +202,8 @@ def play_audio(audio_bytes: bytes) -> None:
     """
     with io.BytesIO(audio_bytes) as buffer:
         samples, sample_rate = sf.read(buffer, dtype="float32")
-    sd.play(samples, sample_rate)
+
+    channels = 1 if samples.ndim == 1 else samples.shape[1]
+    output_rate = supported_output_rate(int(sample_rate), channels)
+    sd.play(resample(samples, int(sample_rate), output_rate), output_rate)
     sd.wait()
