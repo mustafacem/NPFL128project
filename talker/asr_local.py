@@ -12,6 +12,9 @@ from typing import Any, Optional
 DEFAULT_LOCAL_ASR_MODEL: str = "openai/whisper-small"
 """Default Hugging Face model id used for local transcription."""
 
+WHISPER_SAMPLE_RATE: int = 16_000
+"""Sample rate Whisper models expect, in Hz."""
+
 
 class LocalWhisper:
     """A lazily loaded local Whisper model for offline transcription."""
@@ -55,7 +58,7 @@ class LocalWhisper:
         self._pipeline = pipeline(
             "automatic-speech-recognition",
             model=self._model_id,
-            torch_dtype=torch.float16 if use_cuda else torch.float32,
+            dtype=torch.float16 if use_cuda else torch.float32,
             device=0 if use_cuda else -1,
         )
         return self._pipeline
@@ -78,8 +81,16 @@ class LocalWhisper:
         # Imported here so the module imports without soundfile installed.
         import soundfile as sf
 
+        from talker.audio import resample
+
         with io.BytesIO(audio_bytes) as buffer:
             samples, sample_rate = sf.read(buffer, dtype="float32")
+
+        if samples.ndim > 1:
+            samples = samples.mean(axis=1)
+        # Convert here rather than letting the pipeline do it, which would
+        # pull in torchaudio purely to resample.
+        samples = resample(samples, int(sample_rate), WHISPER_SAMPLE_RATE)
 
         generate_kwargs = {"task": "transcribe"}
         if language is not None:
@@ -87,7 +98,7 @@ class LocalWhisper:
 
         recognizer = self._load_pipeline()
         result = recognizer(
-            {"raw": samples, "sampling_rate": sample_rate},
+            {"raw": samples, "sampling_rate": WHISPER_SAMPLE_RATE},
             generate_kwargs=generate_kwargs,
         )
         return str(result["text"]).strip()

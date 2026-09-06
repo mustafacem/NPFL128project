@@ -37,7 +37,7 @@ gtts = [
 # Offline speech recognition with a locally hosted Whisper checkpoint.
 local = [
     "torch>=2.2.0",
-    "transformers>=4.40.0",
+    "transformers>=5.0.0",
 ]
 
 [project.scripts]

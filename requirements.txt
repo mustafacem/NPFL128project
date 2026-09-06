@@ -23,4 +23,4 @@ gTTS>=2.5.0,<3
 # Optional: the offline Whisper speech recognition backend (--stt local).
 # Large downloads; only needed if you do not want to use the OpenAI API.
 torch>=2.2.0
-transformers>=4.40.0
+transformers>=5.0.0
