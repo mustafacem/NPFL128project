@@ -93,12 +93,11 @@ class WakeWordDetector:
             inference_framework=inference_framework,
         )
         self._stream: Optional[sd.InputStream] = None
-        # The microphone may not offer 16 kHz, so record at a rate it does
-        # support and convert each block before scoring it.
-        self._device_rate = supported_input_rate(_SAMPLE_RATE, 1)
-        self._device_frames = (
-            _FRAME_SAMPLES * self._device_rate // _SAMPLE_RATE
-        )
+        # Looked up when the stream opens, so building a detector needs no
+        # sound card: the microphone may not offer 16 kHz, in which case
+        # blocks are captured at a supported rate and converted.
+        self._device_rate: Optional[int] = None
+        self._device_frames: Optional[int] = None
 
     def __enter__(self) -> "WakeWordDetector":
         """Enter the context; the stream is opened only while listening."""
@@ -112,6 +111,11 @@ class WakeWordDetector:
         """
         if self._stream is not None:
             return
+        if self._device_rate is None:
+            self._device_rate = supported_input_rate(_SAMPLE_RATE, 1)
+            self._device_frames = (
+                _FRAME_SAMPLES * self._device_rate // _SAMPLE_RATE
+            )
         # Drop audio buffered before this turn so the previous utterance
         # cannot trigger a detection again.
         self._model.reset()
@@ -174,6 +178,8 @@ class WakeWordDetector:
         Returns:
             Exactly :data:`_FRAME_SAMPLES` int16 samples at 16 kHz.
         """
+        if self._device_rate is None:
+            raise RuntimeError("Input stream is not open.")
         converted = resample(block, self._device_rate, _SAMPLE_RATE)
         scaled = np.clip(converted, -1.0, 1.0) * 32767
         return np.asarray(scaled, dtype=np.int16)

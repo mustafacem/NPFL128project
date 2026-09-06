@@ -1,5 +1,7 @@
 """Unit tests for wake-word detection, with the model and files mocked."""
 
+from contextlib import contextmanager
+from typing import Iterator
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -22,6 +24,21 @@ def _make_detector(scores: dict) -> WakeWordDetector:
     with patch("talker.wake_word.Model", return_value=model), \
             patch("talker.wake_word.ensure_model_downloaded"):
         return WakeWordDetector()
+
+
+@contextmanager
+def _mocked_microphone(stream: MagicMock) -> Iterator[None]:
+    """Stand in for a sound card so the tests need no audio hardware.
+
+    Args:
+        stream: The mock returned in place of a real input stream.
+
+    Yields:
+        None, for the duration of the patched context.
+    """
+    with patch("talker.wake_word.sd.InputStream", return_value=stream), \
+            patch("talker.wake_word.supported_input_rate", return_value=44100):
+        yield
 
 
 def test_detect_in_frame_fires_above_threshold() -> None:
@@ -63,7 +80,7 @@ def test_microphone_is_released_after_detection() -> None:
     stream = MagicMock()
     stream.read.return_value = (np.zeros((3528, 1), dtype=np.float32), False)
 
-    with patch("talker.wake_word.sd.InputStream", return_value=stream):
+    with _mocked_microphone(stream):
         detector.wait_for_wake_word()
 
     stream.stop.assert_called_once()
@@ -76,7 +93,7 @@ def test_listening_clears_buffered_audio() -> None:
     stream = MagicMock()
     stream.read.return_value = (np.zeros((3528, 1), dtype=np.float32), False)
 
-    with patch("talker.wake_word.sd.InputStream", return_value=stream):
+    with _mocked_microphone(stream):
         detector.wait_for_wake_word()
 
     detector._model.reset.assert_called_once()
