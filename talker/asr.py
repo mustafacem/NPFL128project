@@ -8,7 +8,7 @@ runs a Whisper checkpoint on this machine (see :mod:`talker.asr_local`).
 import io
 from typing import Callable, Optional
 
-from openai import OpenAI, omit
+from openai import OpenAI
 
 DEFAULT_ASR_MODEL: str = "whisper-1"
 """Default Whisper model used for transcription."""
@@ -49,12 +49,20 @@ def transcribe(
     audio_file = io.BytesIO(audio_bytes)
     audio_file.name = "audio.wav"
 
-    # Passing NOT_GIVEN lets Whisper auto-detect the language.
-    response = client.audio.transcriptions.create(
-        model=model,
-        file=audio_file,
-        language=language if language is not None else omit,
-    )
+    # The language argument is left out entirely rather than passed as a
+    # sentinel value, whose name has changed between client versions. Whisper
+    # detects the language itself when it is absent.
+    if language is None:
+        response = client.audio.transcriptions.create(
+            model=model,
+            file=audio_file,
+        )
+    else:
+        response = client.audio.transcriptions.create(
+            model=model,
+            file=audio_file,
+            language=language,
+        )
     return response.text.strip()
 
 

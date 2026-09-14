@@ -41,3 +41,16 @@ def test_transcribe_passes_model_and_language() -> None:
     assert kwargs["language"] == "cs"
     # The uploaded file must carry a .wav name so Whisper infers the format.
     assert kwargs["file"].name == "audio.wav"
+
+
+def test_transcribe_omits_language_when_not_given() -> None:
+    """No language key is sent at all, so Whisper detects it itself.
+
+    Passing a sentinel instead would tie the code to one client version.
+    """
+    client = _make_mock_client("hello")
+
+    transcribe(b"fake-wav-bytes", client)
+
+    _, kwargs = client.audio.transcriptions.create.call_args
+    assert "language" not in kwargs

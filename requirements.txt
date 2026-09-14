@@ -2,7 +2,7 @@
 sounddevice>=0.4.6
 soundfile>=0.12.1
 numpy>=1.26.0
-openai>=1.30.0
+openai>=2.0.0
 
 # openWakeWord runtime dependencies (installed explicitly so that the
 # Linux-only tflite-runtime dependency, which lacks a Python 3.12 wheel,
