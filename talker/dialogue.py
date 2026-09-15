@@ -4,6 +4,7 @@ Kept free of any LLM/audio I/O so it can be unit tested in isolation.
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Dict, List, Sequence
 
@@ -25,6 +26,12 @@ DEFAULT_FAREWELL_KEYWORDS: Sequence[str] = (
     "stop",
 )
 """Words that, if present in a user utterance, end the conversation."""
+
+_COURTESY_WORDS: frozenset = frozenset(
+    {"ok", "okay", "alright", "well", "then", "now", "please", "thanks",
+     "thank", "you"}
+)
+"""Politeness words ignored when checking for a farewell."""
 
 
 class DialogueManager:
@@ -97,17 +104,31 @@ def is_farewell(
 
     Args:
         text: The user utterance to check.
-        keywords: Farewell words to match, matched case-insensitively as
-            substrings of ``text``.
+        keywords: Farewell utterances, compared case-insensitively and
+            ignoring punctuation.
 
     Returns:
-        True if any keyword occurs in ``text``, False otherwise (including
-        when ``text`` is empty).
+        True if the whole utterance is a farewell, False otherwise (including
+        when ``text`` is empty). Merely mentioning a farewell word does not
+        count, so "I will stop over in Brno" is not a farewell.
     """
-    if not text:
-        return False
-    lowered = text.lower()
-    return any(keyword in lowered for keyword in keywords)
+    def words(utterance: str) -> str:
+        """Reduce an utterance to the words that carry its meaning.
+
+        Punctuation, capitalisation and politeness words are dropped, so
+        that "Okay, goodbye!" and "goodbye" reduce to the same thing.
+
+        Args:
+            utterance: The text to reduce.
+
+        Returns:
+            The remaining words separated by single spaces.
+        """
+        found = re.findall(r"[a-z']+", utterance.lower())
+        return " ".join(w for w in found if w not in _COURTESY_WORDS)
+
+    spoken = words(text)
+    return bool(spoken) and spoken in {words(k) for k in keywords}
 
 
 def load_history_json(path: Path) -> List[Dict[str, str]]:

@@ -46,11 +46,28 @@ def test_history_property_returns_a_copy() -> None:
     ]
 
 
-def test_is_farewell_matches_known_keywords() -> None:
-    """Farewell keywords are matched case-insensitively as substrings."""
-    assert is_farewell("Okay, Goodbye!")
-    assert is_farewell("gotta run, BYE")
+def test_is_farewell_matches_a_spoken_farewell() -> None:
+    """A farewell is recognised whatever its case or punctuation."""
+    assert is_farewell("Goodbye.")
+    assert is_farewell("BYE!")
     assert not is_farewell("what's the weather like")
+
+
+def test_is_farewell_ignores_politeness() -> None:
+    """Courtesy words around a farewell do not stop it being one."""
+    assert is_farewell("Okay, goodbye!")
+    assert is_farewell("thanks, bye")
+
+
+def test_is_farewell_ignores_a_mentioned_farewell() -> None:
+    """Talking about leaving is not the same as leaving.
+
+    Matching farewells as substrings ended the session on ordinary
+    questions that happened to contain one.
+    """
+    assert not is_farewell("How do you say goodbye in Czech?")
+    assert not is_farewell("I will stop over in Brno")
+    assert not is_farewell("Tell me how to exit vim")
 
 
 def test_is_farewell_empty_text_is_false() -> None:
