@@ -59,12 +59,12 @@ also surveys is out of scope here.
 python -m venv .venv
 source .venv/bin/activate
 
-# Install Talker and its dependencies.
-pip install -e .
+# 1. Install Talker and its dependencies.
+pip install -e .          # or: pip install -r requirements.txt
 
-# openWakeWord declares a hard dependency on tflite-runtime, which has no
-# wheel for recent Python versions on Linux. Talker uses the ONNX backend
-# instead, so openWakeWord is installed without its own dependencies:
+# 2. Install openWakeWord separately, without its own dependencies.
+# It pins tflite-runtime on Linux, which has no wheel for current Python
+# versions; Talker uses the ONNX backend instead. Both steps are needed.
 pip install --no-deps openwakeword==0.6.0
 ```
 
