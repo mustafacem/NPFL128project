@@ -1,0 +1,100 @@
+Sample output
+=============
+
+The text-mode session below is a real captured run. The voice-mode session is
+illustrative: it needs a microphone and speakers, so its console output is
+shown for reference rather than copied from a recorded run.
+
+
+1. Text mode (captured run)
+---------------------------
+
+Text mode replaces the microphone with the keyboard, so the dialogue loop can
+be exercised on a machine without audio hardware.
+
+    $ export OPENROUTER_API_KEY="sk-or-..."
+    $ python -m talker --text-mode
+
+    [Talker] Text mode. Type "goodbye" to exit.
+    [You] What is the capital of France?
+    [Talker] The capital of France is Paris.
+    [You] How many people live there?
+    [Talker] Paris has approximately 2.1 million people living in the city
+             proper. If you include the greater Paris metropolitan area, the
+             population is much larger, over 12 million people.
+    [You] goodbye
+    [Talker] Goodbye!
+    [Talker] Conversation saved to history.json
+
+The second question ("How many people live there?") never names Paris. It is
+answerable only because the whole history is sent with every request, which is
+what makes this a multi-turn dialogue rather than a series of isolated
+questions.
+
+The saved transcript, history.json:
+
+    [
+      {
+        "role": "system",
+        "content": "You are a helpful, friendly voice assistant. Your input comes from a speech-to-text system, so it may contain transcription errors or odd phrasing; use context to infer the user's intent. Keep replies short, clear, and conversational, since they will be read aloud. Reply in plain spoken sentences: no Markdown, bullet lists, or symbols such as asterisks, because the speech synthesizer reads them out literally."
+      },
+      {
+        "role": "user",
+        "content": "What is the capital of France?"
+      },
+      {
+        "role": "assistant",
+        "content": "The capital of France is Paris."
+      },
+      {
+        "role": "user",
+        "content": "How many people live there?"
+      },
+      {
+        "role": "assistant",
+        "content": "Paris has approximately 2.1 million people living in the city proper. If you include the greater Paris metropolitan area, the population is much larger, over 12 million people."
+      }
+    ]
+
+
+2. Recovering from a failed request (captured run)
+--------------------------------------------------
+
+If the language model cannot be reached, the turn is reported and the session
+continues instead of ending in a stack trace. Neither the question nor a reply
+is written to the history, so the transcript holds only completed turns.
+
+    $ python -m talker --text-mode
+
+    [Talker] Text mode. Type "goodbye" to exit.
+    [You] Hello there
+    [Talker] Sorry, I could not reach the language model. Error code: 402 -
+             {'error': {'message': 'Insufficient credits. Add more using
+             https://openrouter.ai/settings/credits', 'code': 402}}
+    [You] goodbye
+    [Talker] Goodbye!
+    [Talker] Conversation saved to history.json
+
+
+3. Voice mode (illustrative)
+----------------------------
+
+Voice mode waits for the wake word before each turn, records until the speaker
+pauses, transcribes the utterance, and reads the reply aloud.
+
+    $ export OPENAI_API_KEY="sk-..."
+    $ export OPENROUTER_API_KEY="sk-or-..."
+    $ python -m talker
+
+    [Talker] Downloading wake-word model 'hey_jarvis'...
+    [Talker] Listening for "hey_jarvis" (say "goodbye" to exit)
+    [Talker] Wake word detected, listening...
+    [You] What is the capital of France?
+    [Talker] The capital of France is Paris.
+    [Talker] Wake word detected, listening...
+    [You] Goodbye.
+    [Talker] Goodbye!
+    [Talker] Conversation saved to history.json
+
+The [Talker] reply lines are also spoken through the default output device.
+The wake-word model is downloaded once, on the first run.
