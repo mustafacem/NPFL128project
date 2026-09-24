@@ -27,7 +27,7 @@ also surveys is out of scope here.
   (no API key, runs on CPU)
 - Microphone recording with automatic end-of-speech (silence) detection
 - Speech-to-text with two interchangeable backends: the OpenAI Whisper API, or a
-  Whisper checkpoint running locally for fully offline recognition
+  Whisper checkpoint running locally, so no audio leaves the machine
 - Multi-turn dialogue management: the whole conversation is sent with every request,
   so the agent can resolve context such as "how many people live *there*?"
 - LLM response generation via OpenRouter (configurable model)
@@ -68,12 +68,17 @@ pip install -e .          # or: pip install -r requirements.txt
 pip install --no-deps openwakeword==0.6.0
 ```
 
-The offline backends are optional extras, installed only if you want them:
+The alternative backends are optional extras, installed only if you want
+them:
 
 ```bash
 pip install -e ".[gtts]"   # gTTS speech synthesis  (--tts gtts)
 pip install -e ".[local]"  # local Whisper model    (--stt local)
 ```
+
+Only the local Whisper backend runs offline. gTTS needs no API key, but it
+sends the reply text to Google Translate's speech service, so it still needs
+an internet connection.
 
 Set the API keys you need:
 
@@ -107,7 +112,9 @@ To run without a microphone or speakers, type instead of speaking:
 python -m talker --text-mode
 ```
 
-To run without sending audio to a hosted service, use the offline backends:
+To keep your voice on your own machine, recognize speech locally. Note
+that gTTS still sends the reply text to Google, so only the audio you speak
+stays local:
 
 ```bash
 python -m talker --stt local --tts gtts
