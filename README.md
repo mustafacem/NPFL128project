@@ -49,6 +49,10 @@ also surveys is out of scope here.
 ## Requirements
 
 - Python 3.11+
+- PortAudio, which `sounddevice` loads to reach the microphone and speakers.
+  The Python wheel does not bundle it, so install it from your system's
+  package manager first. On Debian and Ubuntu:
+  `sudo apt install libportaudio2`
 - An [OpenRouter API key](https://openrouter.ai/) — used for LLM dialogue (always required)
 - An [OpenAI API key](https://platform.openai.com/) — only if you use the hosted
   Whisper (`--stt openai`) or speech (`--tts openai`) backends, which are the defaults
