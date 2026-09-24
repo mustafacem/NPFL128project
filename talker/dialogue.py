@@ -6,7 +6,7 @@ Kept free of any LLM/audio I/O so it can be unit tested in isolation.
 import json
 import re
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Sequence
 
 DEFAULT_SYSTEM_PROMPT: str = (
     "You are a helpful, friendly voice assistant. Your input comes from a "
@@ -44,12 +44,12 @@ class DialogueManager:
             system_prompt: Instructions that set the assistant's persona and
                 behavior. Stored as the first message in the history.
         """
-        self._history: List[Dict[str, str]] = [
+        self._history: list[dict[str, str]] = [
             {"role": "system", "content": system_prompt}
         ]
 
     @property
-    def history(self) -> List[Dict[str, str]]:
+    def history(self) -> list[dict[str, str]]:
         """A copy of the conversation history in OpenAI chat message format.
 
         Returns:
@@ -131,7 +131,7 @@ def is_farewell(
     return bool(spoken) and spoken in {words(k) for k in keywords}
 
 
-def load_history_json(path: Path) -> List[Dict[str, str]]:
+def load_history_json(path: Path) -> list[dict[str, str]]:
     """Read a conversation history previously written by ``save_json``.
 
     Args:
@@ -141,5 +141,5 @@ def load_history_json(path: Path) -> List[Dict[str, str]]:
         The parsed list of ``{"role": ..., "content": ...}`` dictionaries.
     """
     with path.open("r", encoding="utf-8") as history_file:
-        history: List[Dict[str, str]] = json.load(history_file)
+        history: list[dict[str, str]] = json.load(history_file)
     return history

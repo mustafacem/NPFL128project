@@ -4,7 +4,7 @@ OpenRouter exposes an OpenAI-compatible endpoint, so the same ``openai``
 client library is reused with a different base URL.
 """
 
-from typing import Dict, Iterable, List, Sequence, cast
+from typing import Iterable, Sequence, cast
 
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
@@ -34,7 +34,7 @@ def build_client(api_key: str) -> OpenAI:
 
 
 def generate_reply(
-    messages: Sequence[Dict[str, str]],
+    messages: Sequence[dict[str, str]],
     client: OpenAI,
     model: str = DEFAULT_LLM_MODEL,
 ) -> str:
@@ -50,7 +50,7 @@ def generate_reply(
         The assistant's reply text, stripped of surrounding whitespace. An
         empty string is returned if the model produced no content.
     """
-    history: List[Dict[str, str]] = list(messages)
+    history: list[dict[str, str]] = list(messages)
     completion = client.chat.completions.create(
         model=model,
         # The plain role/content dictionaries used throughout this project

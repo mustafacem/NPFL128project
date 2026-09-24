@@ -6,7 +6,7 @@ can be monitored continuously without per-request API cost or latency.
 
 from pathlib import Path
 from types import TracebackType
-from typing import Optional, Type
+from typing import Optional
 
 import numpy as np
 import openwakeword
@@ -129,7 +129,7 @@ class WakeWordDetector:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_value: Optional[BaseException],
         traceback: Optional[TracebackType],
     ) -> None:
