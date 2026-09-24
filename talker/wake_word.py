@@ -155,7 +155,7 @@ class WakeWordDetector:
         finally:
             self.close()
 
-    def _read_block(self) -> tuple:
+    def _read_block(self) -> tuple[np.ndarray, bool]:
         """Read one block of audio from the open stream.
 
         Returns:

@@ -10,7 +10,7 @@ import pytest
 from talker.wake_word import WakeWordDetector, ensure_model_downloaded
 
 
-def _make_detector(scores: dict) -> WakeWordDetector:
+def _make_detector(scores: dict[str, float]) -> WakeWordDetector:
     """Build a detector whose model always reports ``scores``.
 
     Args:
